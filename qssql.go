@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	helperHaving "github.com/iwanjunaid/qssql/internal/helpers/having"
 	helperLimit "github.com/iwanjunaid/qssql/internal/helpers/limit"
 	helperOffset "github.com/iwanjunaid/qssql/internal/helpers/offset"
 	helperOrderBy "github.com/iwanjunaid/qssql/internal/helpers/orderby"
@@ -25,6 +26,7 @@ const (
 	DEFAULT_PARAM_ORDER_BY_NAME = "sort"
 
 	WHERE_KEYWORD    = "WHERE"
+	HAVING_KEYWORD   = "HAVING"
 	LIMIT_KEYWORD    = "LIMIT"
 	OFFSET_KEYWORD   = "OFFSET"
 	ORDER_BY_KEYWORD = "ORDER BY"
@@ -63,12 +65,14 @@ type QSSQL struct {
 
 func New(qs, template string, beforeHook func(qssql iface.GenericQSSQL)) iface.GenericQSSQL {
 	whereAliases := make(map[string]string)
+	havingAliases := make(map[string]string)
 
 	qssql := &QSSQL{
 		queryString:      qs,
 		template:         template,
 		beforeHook:       beforeHook,
 		whereAliases:     whereAliases,
+		havingAliases:    havingAliases,
 		paramLimitName:   DEFAULT_PARAM_LIMIT_NAME,
 		paramLimitValue:  DEFAULT_PARAM_LIMIT_VALUE,
 		paramOffsetName:  DEFAULT_PARAM_OFFSET_NAME,
@@ -242,8 +246,20 @@ func (q *QSSQL) Parse() error {
 					if err != nil {
 						return err
 					}
+				} else if rk == "hlike" {
+					err := helperHaving.ExtractLike(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
 				} else if rk == "ilike" {
 					err := helperWhere.ExtractILike(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
+				} else if rk == "hilike" {
+					err := helperHaving.ExtractILike(q, key, _rv)
 
 					if err != nil {
 						return err
@@ -254,8 +270,20 @@ func (q *QSSQL) Parse() error {
 					if err != nil {
 						return err
 					}
+				} else if rk == "hne" {
+					err := helperHaving.ExtractNotEqual(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
 				} else if rk == "in" {
 					err := helperWhere.ExtractIn(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
+				} else if rk == "hin" {
+					err := helperHaving.ExtractIn(q, key, _rv)
 
 					if err != nil {
 						return err
@@ -266,8 +294,20 @@ func (q *QSSQL) Parse() error {
 					if err != nil {
 						return err
 					}
+				} else if rk == "hnin" {
+					err := helperHaving.ExtractNotIn(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
 				} else if rk == "gt" {
 					err := helperWhere.ExtractGreaterThan(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
+				} else if rk == "hgt" {
+					err := helperHaving.ExtractGreaterThan(q, key, _rv)
 
 					if err != nil {
 						return err
@@ -278,14 +318,32 @@ func (q *QSSQL) Parse() error {
 					if err != nil {
 						return err
 					}
+				} else if rk == "hgte" {
+					err := helperHaving.ExtractGreaterThanOrEqual(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
 				} else if rk == "lt" {
 					err := helperWhere.ExtractLowerThan(q, key, _rv)
 
 					if err != nil {
 						return err
 					}
+				} else if rk == "hlt" {
+					err := helperHaving.ExtractLowerThan(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
 				} else if rk == "lte" {
 					err := helperWhere.ExtractLowerThanOrEqual(q, key, _rv)
+
+					if err != nil {
+						return err
+					}
+				} else if rk == "hlte" {
+					err := helperHaving.ExtractLowerThanOrEqual(q, key, _rv)
 
 					if err != nil {
 						return err
@@ -302,11 +360,17 @@ func (q *QSSQL) GetSQL() (string, error) {
 	type Clause struct {
 		Where   string
 		OrderBy string
+		Having  string
+		Offset  string
+		Limit   string
 	}
 
 	clause := &Clause{}
 	clause.Where = q.GetWhereClause()
 	clause.OrderBy = q.GetOrderByClause()
+	clause.Having = q.GetHavingClause()
+	clause.Offset = q.GetOffsetClause()
+	clause.Limit = q.GetLimitClause()
 
 	t, err := template.New("sql").Parse(q.template)
 
@@ -333,10 +397,55 @@ func (q *QSSQL) GetWhereBindValues() []interface{} {
 	return q.whereBindValues
 }
 
+func (q *QSSQL) AddHavingAlias(key string, value string) {
+	q.havingAliases[key] = value
+}
+
+func (q *QSSQL) AddHavingAliases(aliases map[string]string) {
+	for key, value := range aliases {
+		q.havingAliases[key] = value
+	}
+}
+
+func (q *QSSQL) GetHavingAliases() map[string]string {
+	return q.havingAliases
+}
+
+func (q *QSSQL) AddHavingValue(value string) {
+	q.havingValues = append(q.havingValues, value)
+}
+
+func (q *QSSQL) AddHavingValues(values []string) {
+	for _, v := range values {
+		q.havingValues = append(q.havingValues, v)
+	}
+}
+
+func (q *QSSQL) GetHavingValues() []string {
+	return q.havingValues
+}
+
+func (q *QSSQL) AddHavingBindValue(param interface{}) {
+	q.havingBindValues = append(q.havingBindValues, param)
+}
+
+func (q *QSSQL) GetHavingBindValues() []interface{} {
+	return q.havingBindValues
+}
+
+func (q *QSSQL) GetHavingClause() string {
+	if len(q.havingValues) == 0 {
+		return ""
+	}
+
+	return HAVING_KEYWORD + " " + strings.Join(q.havingValues[:], " AND ")
+}
+
 func (q *QSSQL) GetBindValues() []interface{} {
 	var bindValues []interface{}
 
 	bindValues = append(bindValues, q.whereBindValues...)
+	bindValues = append(bindValues, q.havingBindValues...)
 
 	return bindValues
 }

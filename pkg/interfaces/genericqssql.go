@@ -16,6 +16,17 @@ type GenericQSSQL interface {
 	GetWhereBindValues() []interface{}
 	GetWhereClause() string
 
+	AddHavingAlias(string, string)
+	AddHavingAliases(map[string]string)
+	GetHavingAliases() map[string]string
+
+	AddHavingValue(string)
+	AddHavingValues([]string)
+	GetHavingValues() []string
+	AddHavingBindValue(interface{})
+	GetHavingBindValues() []interface{}
+	GetHavingClause() string
+
 	Parse() error
 	GetSQL() (string, error)
 	GetBindValues() []interface{}
