@@ -1,21 +1,10 @@
 package where
 
 import (
-	"errors"
-	"fmt"
-
 	iface "github.com/iwanjunaid/qssql/pkg/interfaces"
 )
 
-func ExtractString(q iface.GenericQSSQL, key string, value interface{}) error {
-	assertedValue, ok := value.(string)
-
-	if !ok {
-		errorMessage := fmt.Sprintf("Can't assert to string for key %s", key)
-
-		return errors.New(errorMessage)
-	}
-
+func ExtractString(q iface.GenericQSSQL, key string, value string) error {
 	whereAliases := q.GetWhereAliases()
 	aliasValue, ok := whereAliases[key]
 
@@ -25,7 +14,7 @@ func ExtractString(q iface.GenericQSSQL, key string, value interface{}) error {
 		q.AddWhereValue(aliasValue + " = ?")
 	}
 
-	q.AddWhereBindValue(assertedValue)
+	q.AddWhereBindValue(value)
 
 	return nil
 }

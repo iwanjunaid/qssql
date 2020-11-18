@@ -2,18 +2,20 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/derekstavis/go-qs"
 	helperHaving "github.com/iwanjunaid/qssql/internal/helpers/having"
 	helperLimit "github.com/iwanjunaid/qssql/internal/helpers/limit"
 	helperOffset "github.com/iwanjunaid/qssql/internal/helpers/offset"
 	helperOrderBy "github.com/iwanjunaid/qssql/internal/helpers/orderby"
 	helperWhere "github.com/iwanjunaid/qssql/internal/helpers/where"
 	iface "github.com/iwanjunaid/qssql/pkg/interfaces"
-	"github.com/iwanjunaid/qssql/pkg/parser/qs"
+	// "github.com/iwanjunaid/qssql/pkg/parser/qs"
 )
 
 const (
@@ -160,28 +162,25 @@ func (q *QSSQL) GetTemplate() string {
 }
 
 func (q *QSSQL) Parse() error {
-	parsed, parseErr := qs.ToJSON(q.queryString)
+	// parsed, parseErr := qs.ToJSON(q.queryString)
+	unmarshalled, err := qs.Unmarshal(q.queryString)
 
-	if parseErr != nil {
-		return parseErr
+	// if parseErr != nil {
+	// 	return parseErr
+	// }
+
+	if err != nil {
+		return err
 	}
 
-	var data map[string]interface{}
-
-	unmarshallErr := json.Unmarshal([]byte(parsed), &data)
-
-	if unmarshallErr != nil {
-		return unmarshallErr
-	}
-
-	q.parsedQueryString = data
+	q.parsedQueryString = unmarshalled
 
 	// Call before hook
 	if q.beforeHook != nil {
 		q.beforeHook(q)
 	}
 
-	for _key, value := range data {
+	for _key, value := range unmarshalled {
 		keyTrimmed := strings.TrimSpace(_key)
 		key := strings.ToLower(keyTrimmed)
 
@@ -216,16 +215,30 @@ func (q *QSSQL) Parse() error {
 
 		switch value.(type) {
 		case string:
-			err := helperWhere.ExtractString(q, key, value)
+			assertedValue, ok := value.(string)
 
-			if err != nil {
-				return err
+			if !ok {
+				errorMessage := fmt.Sprintf("Can't assert to string for key %s", key)
+
+				return errors.New(errorMessage)
+
 			}
-		case float64:
-			err := helperWhere.ExtractFloat64(q, key, value)
+
+			floatParsed, err := strconv.ParseFloat(assertedValue, 64)
 
 			if err != nil {
-				return err
+				err = helperWhere.ExtractString(q, key, assertedValue)
+
+				if err != nil {
+					return err
+				}
+			} else {
+				err = helperWhere.ExtractFloat64(q, key, floatParsed)
+
+				if err != nil {
+					return err
+				}
+
 			}
 		case []interface{}:
 			err := helperWhere.ExtractIn(q, key, value)
