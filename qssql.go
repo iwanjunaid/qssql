@@ -162,12 +162,7 @@ func (q *QSSQL) GetTemplate() string {
 }
 
 func (q *QSSQL) Parse() error {
-	// parsed, parseErr := qs.ToJSON(q.queryString)
 	unmarshalled, err := qs.Unmarshal(q.queryString)
-
-	// if parseErr != nil {
-	// 	return parseErr
-	// }
 
 	if err != nil {
 		return err
